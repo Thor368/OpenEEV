@@ -4,11 +4,18 @@
  * Created: 04.06.2023 21:11:41
  * Author : Alexander Schroeder
  */ 
-#define F_CPU 12000000
+
+#include "config.h"
+#include "EEV.h"
+#include "oneWire.h"
+#include "relay.h"
+#include "terminal.h"
+#include "analog.h"
 
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include <util/delay.h>
-#include <stdbool.h>
+#include <stdio.h>
 
 // EEV IO
 #define EEV_PORT		PORTD
@@ -21,104 +28,54 @@
 #define EEV_CLOSE		false
 #define EEV_OPEN		true
 
-void init(void)
+uint64_t ticks = 0;
+
+uint64_t test_timer = 0;
+bool test_state = false;
+
+ISR(TIMER0_COMPA_vect)
 {
-	EEV_PORT &= ~((1 << EEV_A1) | (1 << EEV_A2) | (1 << EEV_B1) | (1 << EEV_B2));
-	EEV_DDR |= (1 << EEV_A1) | (1 << EEV_A2) | (1 << EEV_B1) | (1 << EEV_B2);
-	
+	ticks++;
 }
 
-void EEV_step(bool dir, bool hold_pulse)
+void init(void)
 {
-	static uint8_t step = 0;
+	OCR0A = 249;
+	TCCR0A = 0b11;  // fast PWM with OCR0A as TOP
+	TCCR0B = 0b1011;  // /64 prescaling
+	TIMSK0 = 0b10;  // activate OCR0A interrupt
 	
-	if (hold_pulse) {}
-	else if (dir)
-	{
-		if (step == 7)
-			step = 0;
-		else
-			step++;
-	}
-	else
-	{
-		if (!step)
-			step = 7;
-		else
-			step--;
-	}
+	ticks = 0;
 	
-	EEV_PORT &= ~((1 << EEV_A1) | (1 << EEV_A2) | (1 << EEV_B1) | (1 << EEV_B2));
-	switch (step)
-	{
-		case 0:
-			EEV_PORT |= (1 << EEV_A1);
-			break;
-
-		case 1:
-			EEV_PORT |= (1 << EEV_A1) | (1 << EEV_B1);
-			break;
-
-		case 2:
-			EEV_PORT |= (1 << EEV_B1);
-			break;
-
-		case 3:
-			EEV_PORT |= (1 << EEV_A2) | (1 << EEV_B1);
-			break;
-
-		case 4:
-			EEV_PORT |= (1 << EEV_A2);
-			break;
-
-		case 5:
-			EEV_PORT |= (1 << EEV_A2) | (1 << EEV_B2);
-			break;
-
-		case 6:
-			EEV_PORT |= (1 << EEV_B2);
-			break;
-
-		case 7:
-			EEV_PORT |= (1 << EEV_A1) | (1 << EEV_B2);
-			break;
-	}
+	EEV_init();
+	DS_init();
+	term_init();
+	analog_init();
 	
-	if (hold_pulse)
-		_delay_ms(500);
-	else
-		_delay_ms(12);
-
-	EEV_PORT &= ~((1 << EEV_A1) | (1 << EEV_A2) | (1 << EEV_B1) | (1 << EEV_B2));
+	sei();
 }
 
 int main(void)
 {
 	init();
+	
+//	_delay_ms(1000);
+	
+// 	EEV_home();
+// 	EEV_steps(500, EEV_OPEN);
 
-	EEV_step(EEV_CLOSE, true);
-	for (uint16_t i = 0; i < 700; i++)
-		EEV_step(EEV_CLOSE, false);
-	
-	EEV_step(EEV_CLOSE, true);
-	
+	test_timer = ticks + 1000;
     while (1) 
     {
-		EEV_step(EEV_CLOSE, true);
-		for (uint16_t i = 0; i < 500; i++)
-			EEV_step(EEV_OPEN, false);
-	
-		EEV_step(EEV_CLOSE, true);
-	
-		_delay_ms(1000);
-
-		EEV_step(EEV_CLOSE, true);
-		for (uint16_t i = 0; i < 500; i++)
-			EEV_step(EEV_CLOSE, false);
+//		relay_handler();
 		
-		EEV_step(EEV_CLOSE, true);
-		
-		_delay_ms(1000);
+		if (ticks >= test_timer)
+		{
+			test_timer += 1000;
+			
+			p = analog_read(0b1111);
+			printf("p=%u\n", p);
+		}
     }
 }
 
