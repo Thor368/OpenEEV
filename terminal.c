@@ -16,20 +16,21 @@ static FILE mystdout = FDEV_SETUP_STREAM(usart_putchar_printf, NULL, _FDEV_SETUP
 
 void term_init(void)
 {
-	UCSR0A = 0b10;
-	UCSR0B = 0b11000;
-	UCSR0C = 0b110;
-	UBRR0 = 12;
+	UCSRA = 0b10;
+	UCSRB = 0b11000;
+	UCSRC = 0b10000110;
+	UBRRH = 0b00000000;
+	UBRRL = 16;
 	
 	stdout = &mystdout;
 }
 
  int usart_putchar_printf(char var, FILE *stream)
  {
-	 while(!(UCSR0A & (1 << UDRE0)));
-	 UCSR0A |= 1 << UDRE0;
+	 while(!(UCSRA & (1 << UDRE)));
+	 UCSRA |= 1 << UDRE;
 	 
-	 UDR0 = var;
+	 UDR = var;
 	 
 	 return 0;
  }

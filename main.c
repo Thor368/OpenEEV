@@ -16,6 +16,7 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 // EEV IO
 #define EEV_PORT		PORTD
@@ -33,17 +34,15 @@ uint64_t ticks = 0;
 uint64_t test_timer = 0;
 bool test_state = false;
 
-ISR(TIMER0_COMPA_vect)
+ISR(TIMER0_OVF_vect)
 {
 	ticks++;
 }
 
 void init(void)
 {
-	OCR0A = 249;
-	TCCR0A = 0b11;  // fast PWM with OCR0A as TOP
-	TCCR0B = 0b1011;  // /64 prescaling
-	TIMSK0 = 0b10;  // activate OCR0A interrupt
+	TCCR0 = 0b011;  // /64 prescaling
+	TIMSK = 0b1;  // activate OCR0A interrupt
 	
 	ticks = 0;
 	
@@ -73,8 +72,20 @@ int main(void)
 		{
 			test_timer += 1000;
 			
-			p = analog_read(0b1111);
-			printf("p=%u\n", p);
+// 			DS_convert_T(temp_avaporator_adr);
+// 			while(DS_bus_busy());
+// 			int16_t temp = DS_read_temperature(temp_avaporator_adr);
+// 			printf("temp = %d.%dC\n", temp/10, abs(temp%10));
+ 			
+//  			uint8_t tmp[8];
+// 			uint8_t crc = DS_read_ROM(tmp);
+// 			
+//  			printf("ROM = ");
+// 			for (uint8_t i = 0; i < 8; i++)
+// 				printf("0x%02x ", tmp[i]);
+//  			printf("\n");
+
+//			printf("temp = %d\n", analog_get_suc_temp());
 		}
     }
 }

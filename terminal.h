@@ -2,7 +2,7 @@
  * terminal.h
  *
  * Created: 06.06.2023 16:40:29
- *  Author: main
+ *  Author: Alexander Schroeder
  */ 
 
 

@@ -5,29 +5,34 @@
  *  Author: Alexander Schroeder
  */ 
 
-#include <avr/interrupt.h>
-
 #include "analog.h"
+
+#include <avr/interrupt.h>
 
 uint16_t p = 0;
 
 ISR(ADC_vect)
 {
-	p = ADC;
+	p -= p >> 4;
+	p += ADC;
 }
 
 void analog_init(void)
 {
-	ADMUX =  0b01000000;
-	ADCSRA = 0b11000001;
-	
-	while(ADCSRA & (1 << ADSC));
+	ADMUX =  0b11000000;
+	ADCSRA = 0b11111111;
 }
 
-uint16_t analog_read(uint8_t channel)
+uint16_t analog_get_suc_pressure(void)
 {
-	ADMUX = (ADMUX & 0xF0) | (channel & 0xF);
-	ADCSRA |= (1 << ADSC);
-	while(ADCSRA & (1 << ADSC));
-	return ADC;
+	uint16_t result = p >> 4;
+	return result*10 - 3490;  // 18bar max; 4-20mA sensor; 2,56V ref; 6,79bar max; R290 -> 12°C max
+}
+
+uint16_t analog_get_suc_temp(void)
+{
+	int32_t result = analog_get_suc_pressure();
+	result = -result*result*46/10000000 + result*113/1000 - 434;  // R290 tuned for -10C to +15C
+	
+	return result;
 }

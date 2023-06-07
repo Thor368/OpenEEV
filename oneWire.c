@@ -2,7 +2,7 @@
  * oneWire.c
  *
  * Created: 06.06.2023 08:39:14
- *  Author: main
+ *  Author: Alexander Schroeder
  */ 
 
 #include "config.h"
@@ -27,6 +27,9 @@
 #define DS_COPY_SCR		0x48
 #define DS_RECALL_EE	0xB8
 #define DS_READ_POWER	0xB4
+
+uint8_t temp_adr_suc_line[] = {DS_SUC_ADR};
+
 
 
 void DS_init(void)
@@ -86,7 +89,7 @@ void DS_write_block(uint8_t* data, uint8_t len)
 		DS_write_byte(*data++);
 }
 
-void DS_ROM(uint64_t* adr)
+void DS_ROM(uint8_t* adr)
 {
 	if (!adr)
 		DS_write_byte(DS_SKIP_ROM);
@@ -124,6 +127,29 @@ uint8_t DS_read_byte(void)
 	return result;
 }
 
+void DS_read_block(uint8_t* data, uint8_t len)
+{
+	while(len--)
+		*data++ = DS_read_byte();
+}
+
+uint8_t DS_CRC(uint8_t* data, uint8_t len)
+{
+	uint8_t crc = 0;
+	while (len--)
+	{
+		uint8_t inbyte = *data++;
+		for (uint8_t i = 8; i; i--)
+		{
+			uint8_t mix = (crc ^ inbyte) & 0x01;
+			crc >>= 1;
+			if (mix) crc ^= 0x8C;
+				inbyte >>= 1;
+		}
+	}
+	return crc;
+}
+
 bool DS_slave_present(void)
 {
 	return !DS_reset();
@@ -134,8 +160,10 @@ bool DS_bus_busy(void)
 	return !DS_read_bit();
 }
 
-void DS_set_scratchpad(uint64_t* adr, uint8_t Rx, uint8_t TH, uint8_t TL)
+void DS_set_scratchpad(uint8_t* adr, uint8_t Rx, uint8_t TH, uint8_t TL)
 {
+	DS_reset();
+
 	DS_ROM(adr);
 	
 	DS_write_byte(DS_WRITE_SCR);
@@ -145,25 +173,58 @@ void DS_set_scratchpad(uint64_t* adr, uint8_t Rx, uint8_t TH, uint8_t TL)
 	DS_write_byte(0b11111 | (Rx << 5));  // CONFIG
 }
 
-void DS_copy_scratchpad(uint64_t* adr)
+void DS_copy_scratchpad(uint8_t* adr)
 {
+	DS_reset();
+
 	DS_ROM(adr);
 	
 	DS_write_byte(DS_COPY_SCR);
 }
 
-uint16_t DS_read_temperature(uint64_t* adr)
+uint8_t DS_read_scratchpad(uint8_t* adr, uint8_t* data)
 {
+	DS_reset();
+
 	DS_ROM(adr);
 	
 	DS_write_byte(DS_READ_SCR);
 	
-	int32_t temp = DS_read_byte();
-	temp |= DS_read_byte() << 8;
+	DS_read_block((uint8_t*) data, 9);
+
+	return DS_CRC(data, 9);
+}
+
+
+int16_t DS_read_temperature(uint8_t* adr)
+{
+	uint8_t data[9];
 	
-	DS_reset();
+	if (DS_read_scratchpad(adr, data))
+		return -32768;
 	
-	temp = temp*625/10000;
+	int32_t temp = data[0] | data[1] << 8;
+	temp = temp*625/1000;
 	
 	return temp;
+}
+
+void DS_convert_T(uint8_t* adr)
+{
+	DS_reset();
+
+	DS_ROM(adr);
+	
+	DS_write_byte(DS_CONVERT_T);
+}
+
+uint8_t DS_read_ROM(uint8_t* adr)
+{
+	DS_reset();
+	
+	DS_write_byte(DS_READ_ROM);
+	
+	DS_read_block((uint8_t*) adr, 8);
+	
+	return DS_CRC((uint8_t*) adr, 8);
 }

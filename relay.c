@@ -18,6 +18,9 @@
 #define SOFT_OFF		OCR1B = 511  // 0V
 #define SOFT_ON			OCR1B = 255  // 12V
 
+#define PUMPS_ON		PORTD |= 1 << PD6
+#define PUMPS_OFF		PORTD &= ~(1 << PD6)
+
 enum comp_state_t { cs_init = 0, cs_idle, cs_softstart, cs_decay, cs_start, cs_stop } comp_state;
 	
 uint64_t relay_timer = 0;
@@ -26,71 +29,39 @@ void relay_init(void)
 {
  	COMP_OFF;
  	SOFT_OFF;
+	ICR1 = 512;
 	TCCR1A = 0b11110010;  // COM1A and COM1B inverting
-	TCCR1B = 0b1001;  // 9bit fast PWM, no prescaling -> 23.4375kHz
- 	TCCR1C = 0;
+	TCCR1B = 0b11001;  // 9bit fast PWM, no prescaling -> 23.4375kHz
 
 	PORTB &= ~((1 << PB1) | (1 << PB2));
 	DDRB |= (1 << PB1) | (1 << PB2);
+	
+	PUMPS_OFF;
+	DDRD |= 1 << PD6;
 }
 
-void relay_comp_start(void)
+void relay_comp(uint8_t state)
 {
-	if (comp_state == cs_idle)
-		comp_state = cs_start;
+	if (state == RELAY_DECAY)
+		COMP_DECAY;
+	else if (state == RELAY_ON)
+		COMP_ON;
+	else
+		COMP_OFF;
 }
 
-void relay_comp_stop(void)
+void relay_soft(bool state)
 {
-	comp_state = cs_stop;
+	if (state)
+		SOFT_ON;
+	else
+		SOFT_OFF;
 }
 
-void relay_handler(void)
+void relay_pumps(bool state)
 {
-	switch(comp_state)
-	{
-		case cs_init:
-			relay_init();
-			
-			comp_state = cs_idle;
-			break;
-		
-		case cs_idle:
-			break;
-		
-		case cs_softstart:
-			if (ticks >= relay_timer)
-			{
-				COMP_ON;
-				
-				relay_timer = ticks + 200;
-				comp_state = cs_decay;
-			}
-			break;
-
-		case cs_decay:
-			if (ticks >= relay_timer)
-			{
-				COMP_DECAY;
-				SOFT_OFF;
-
-				comp_state = cs_idle;
-			}
-			break;
-				
-		case cs_start:
-			COMP_OFF;
-			SOFT_ON;
-			
-			relay_timer = ticks + 2000;
-			comp_state = cs_softstart;
-			break;
-		
-		case cs_stop:
-			COMP_OFF;
-			SOFT_OFF;
-			
-			comp_state = cs_idle;
-			break;
-	}
+	if (state)
+		PUMPS_ON;
+	else
+		PUMPS_OFF;
 }

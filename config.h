@@ -2,7 +2,7 @@
  * config.h
  *
  * Created: 06.06.2023 08:37:32
- *  Author: main
+ *  Author: Alexander Schroeder
  */ 
 
 
@@ -26,6 +26,15 @@
 #define DS_DDR			DDRB
 #define DS_PIN			PINB
 #define DS_IO			PB0
+
+// Temperature sensor addresses
+#define DS_SUC_ADR		0x28, 0xe6, 0x14, 0x77, 0x91, 0x0a, 0x02, 0x10
+//#define DS_TARGET_ADR	0x28, 
+
+// Temperature controller
+#define TEMP_POS_HYST	2
+#define TEMP_NEG_HYST	2
+#define TEMP_SETPOINT	37
 
 extern uint64_t ticks;  // ms tick counter
 
