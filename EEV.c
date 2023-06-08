@@ -12,123 +12,177 @@
 #include <util/delay.h>
 #include <stdlib.h>
 
+int16_t EEV_position;
 uint8_t step = 0;
-uint16_t EEV_position;
 
+uint64_t eev_timer = 0;
+
+enum EEV_states { eev_idle, eev_start, eev_running, eev_stop} EEV_state;
 
 void EEV_init(void)
 {
 	EEV_PORT &= ~((1 << EEV_A1) | (1 << EEV_A2) | (1 << EEV_B1) | (1 << EEV_B2));
 	EEV_DDR |= (1 << EEV_A1) | (1 << EEV_A2) | (1 << EEV_B1) | (1 << EEV_B2);
+	
+	EEV_state = eev_idle;
 }
 
-void EEV_home(void)
+void EEV_update(void)
 {
-	EEV_relative(700, EEV_CLOSE, true);
+	uint8_t p = EEV_PORT & ~((1 << EEV_A1) | (1 << EEV_A2) | (1 << EEV_B1) | (1 << EEV_B2));
 	
-	EEV_position = 0;
-}
-
-void EEV_step(bool dir, bool hold_pulse, bool force)
-{
-	static uint8_t step = 0;
-	
-	if (hold_pulse) {}
-	else if (dir)
-	{
-		if (EEV_position < EEV_max)
-			EEV_position++;
-		else if (!force)
-			return;
-			
-		if (step == 7)
-			step = 0;
-		else
-			step++;
-	}
-	else
-	{
-		if (EEV_position > 0)
-			EEV_position--;
-		else if (!force)
-			return;
-
-		EEV_position--;
-		
-		if (!step)
-			step = 7;
-		else
-			step--;
-	}
-	
-	EEV_PORT &= ~((1 << EEV_A1) | (1 << EEV_A2) | (1 << EEV_B1) | (1 << EEV_B2));
 	switch (step)
 	{
 		case 0:
-			EEV_PORT |= (1 << EEV_A1);
+			p |= (1 << EEV_A1);
 			break;
 
 		case 1:
-			EEV_PORT |= (1 << EEV_A1) | (1 << EEV_B1);
+			p |= (1 << EEV_A1) | (1 << EEV_B1);
 			break;
 
 		case 2:
-			EEV_PORT |= (1 << EEV_B1);
+			p |= (1 << EEV_B1);
 			break;
 
 		case 3:
-			EEV_PORT |= (1 << EEV_A2) | (1 << EEV_B1);
+			p |= (1 << EEV_A2) | (1 << EEV_B1);
 			break;
 
 		case 4:
-			EEV_PORT |= (1 << EEV_A2);
+			p |= (1 << EEV_A2);
 			break;
 
 		case 5:
-			EEV_PORT |= (1 << EEV_A2) | (1 << EEV_B2);
+			p |= (1 << EEV_A2) | (1 << EEV_B2);
 			break;
 
 		case 6:
-			EEV_PORT |= (1 << EEV_B2);
+			p |= (1 << EEV_B2);
 			break;
 
 		case 7:
-			EEV_PORT |= (1 << EEV_A1) | (1 << EEV_B2);
+			p |= (1 << EEV_A1) | (1 << EEV_B2);
 			break;
 	}
 	
-	if (hold_pulse)
-		_delay_ms(500);
-	else
-		_delay_ms(12);
+	EEV_PORT = p;
+}
 
+void EEV_release(void)
+{
 	EEV_PORT &= ~((1 << EEV_A1) | (1 << EEV_A2) | (1 << EEV_B1) | (1 << EEV_B2));
 }
 
-void EEV_relative(uint16_t steps, bool dir, bool force)
+void EEV_step(bool dir)
 {
-	EEV_step(false, true, false);
-
-	for (uint16_t i = 0; i < steps; i++)
-		EEV_step(dir, false, force);
-
-	EEV_step(false, true, false);
+	if (dir)
+	{
+		if (step < 7)
+			step++;
+		else
+			step = 0;
+	}
+	else
+	{
+		if (step)
+			step--;
+		else
+			step = 7;
+	}
+	
+	EEV_update();
 }
 
-void EEV_absolute(uint16_t new_position)
+void EEV_home(bool open_first)
 {
-	if (new_position < EEV_min)
-		new_position = 0;
-	else if (new_position > EEV_max)
-		new_position = EEV_max;
-	
-	bool dir = EEV_CLOSE;
-	if (new_position > EEV_position)
-		dir = EEV_OPEN;
-	
-	EEV_step(false, true, false);
-	
-	EEV_relative(abs(EEV_position - new_position), dir, false);
+	for (uint16_t i = 0; i < 500; i++)
+	{
+		EEV_step(true);
+		_delay_ms(12);
+	}
 
-	EEV_step(false, true, false);
+	for (uint16_t i = 0; i < 700; i++)
+	{
+		EEV_step(false);
+		_delay_ms(12);
+	}
+	
+	EEV_position = 0;
+	EEV_position = 0;
+}
+
+void EEV_handler(void)
+{
+	if (EEV_position < EEV_min)
+		EEV_position = 0;
+	else if (EEV_position > EEV_max)
+		EEV_position = EEV_max;
+
+	switch(EEV_state)
+	{
+		case eev_idle:
+			if (EEV_position != EEV_position)
+			{
+				EEV_update();
+				
+				eev_timer = ticks + 500;
+				EEV_state = eev_start;
+			}
+			break;
+		
+		case eev_start:
+			if (ticks >= eev_timer)
+			{
+				eev_timer = ticks + 12;
+				EEV_state = eev_running;
+			}
+			break;
+		
+		case eev_running:
+			if (ticks >= eev_timer)
+			{
+				if (EEV_position > EEV_position)
+				{
+					EEV_step(true);
+					EEV_position++;
+				}
+				else if (EEV_position < EEV_position)
+				{
+					EEV_step(false);
+					EEV_position--;
+				}
+				else
+				{
+					eev_timer = ticks + 500;
+					EEV_state = eev_stop;
+					break;
+				}
+				
+				eev_timer += 12;
+			}
+			break;
+		
+		case eev_stop:
+			if (ticks >= eev_timer)
+			{
+				EEV_release();
+				EEV_state = eev_idle;
+			}
+	}
+}
+
+void EEV_set_position(uint16_t pos)
+{
+	if (pos > EEV_max)
+		EEV_position = EEV_max;
+	else if (pos < EEV_min)
+		EEV_position = 0;
+	else
+		EEV_position = pos;
+}
+
+uint16_t EEV_get_position(void)
+{
+	return EEV_position;
 }

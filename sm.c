@@ -15,7 +15,7 @@
 #include <stdio.h>
 
 
-enum sm_state_t { sms_init, sms_home, sms_start, sms_softstart, sms_decay, sms_regulate, sms_coastdown, sms_wait_call } sm_state;
+enum sm_states { sms_init, sms_home, sms_start, sms_softstart, sms_decay, sms_regulate, sms_coastdown, sms_wait_call } sm_state;
 
 uint64_t sm_timer, temp_timer;
 
@@ -33,9 +33,9 @@ void sm_init(void)
 void sm_superheat_regulator(void)
 {
 	if (superheat < (sh_setpoint - sh_hysteresis))
-		EEV_step(EEV_CLOSE, false, false);
+		EEV_position--;
 	else if (superheat > (sh_setpoint + sh_hysteresis))
-		EEV_step(EEV_OPEN, false, false);
+		EEV_position++;
 }
 
 void sm_handler(void)
@@ -55,12 +55,8 @@ void sm_handler(void)
 			break;
 		
 		case sms_home:
-			printf("opening eev... ");
-			EEV_relative(500, EEV_OPEN, true);
-			printf("done.\n");
-
 			printf("homing eev... ");
-			EEV_home();
+			EEV_home(true);
 			printf("done.\n");
 			
 			sm_state = sms_start;
@@ -69,7 +65,7 @@ void sm_handler(void)
 		case sms_start:
 			printf("call\n");
 			printf("set eev to min... ");
-			EEV_absolute(EEV_min);
+			EEV_position = 
 			printf("done\n");
 			printf("compressor start: soft... ");
 			relay_soft(RELAY_ON);

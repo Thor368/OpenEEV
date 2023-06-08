@@ -19,17 +19,15 @@
 #define EEV_min			50
 #define EEV_max			500
 
-extern uint16_t EEV_position;
 
 void EEV_init(void);
 
-void EEV_home(void);  // home EEV to fully closed position
+void EEV_handler(void);
 
-void EEV_step(bool dir, bool hold_pulse, bool force);  // single step EEV
+void EEV_home(bool open_first);  // home EEV to fully closed position
 
-void EEV_relative(uint16_t steps, bool dir, bool force);  // relative movement
+void EEV_set_position(uint16_t pos);
 
-void EEV_absolute(uint16_t new_position);  // set EEV to absolute position (0-100%)
-
+uint16_t EEV_get_position(void);
 
 #endif /* EEV_H_ */
