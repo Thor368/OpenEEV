@@ -12,24 +12,30 @@
 #include "analog.h"
 
 #include <stdint.h>
+#include <stdio.h>
 
 
-enum sm_state_t { sms_init, sms_home, sms_start, sms_softstart, sms_decay, sms_regulate, sms_shutdown, sms_coastdown, sms_wait_call } sm_state;
+enum sm_state_t { sms_init, sms_home, sms_start, sms_softstart, sms_decay, sms_regulate, sms_coastdown, sms_wait_call } sm_state;
 
-uint64_t sm_timer, equal_timer, temp_timer;
+uint64_t sm_timer, temp_timer;
 
-uint16_t suc_temp, target_temp, suc_temp_pres;
+int16_t suc_temp, target_temp, suc_temp_pres, superheat;
 
 void sm_init(void)
 {
 	sm_state = sms_init;
 	suc_temp = 0;
 	target_temp = 0;
+	suc_temp_pres = 0;
+	superheat = 0;
 }
 
 void sm_superheat_regulator(void)
 {
-	
+	if (superheat < (sh_setpoint - sh_hysteresis))
+		EEV_step(EEV_CLOSE, false, false);
+	else if (superheat > (sh_setpoint + sh_hysteresis))
+		EEV_step(EEV_OPEN, false, false);
 }
 
 void sm_handler(void)
@@ -43,18 +49,29 @@ void sm_handler(void)
 			relay_soft(RELAY_OFF);
 			relay_pumps(RELAY_OFF);
 			
-			equal_timer = ticks + 30000;
 			sm_state = sms_home;
+			
+			printf("sm start\n");
 			break;
 		
 		case sms_home:
+			printf("opening eev... ");
+			EEV_relative(500, EEV_OPEN, true);
+			printf("done.\n");
+
+			printf("homing eev... ");
 			EEV_home();
+			printf("done.\n");
 			
 			sm_state = sms_start;
 			break;
 		
 		case sms_start:
-			EEV_absolute(500);
+			printf("call\n");
+			printf("set eev to min... ");
+			EEV_absolute(EEV_min);
+			printf("done\n");
+			printf("compressor start: soft... ");
 			relay_soft(RELAY_ON);
 			
 			sm_timer = ticks + 2000;
@@ -64,6 +81,7 @@ void sm_handler(void)
 		case sms_softstart:
 			if (ticks >= sm_timer)
 			{
+				printf("hard... ");
 				relay_comp(RELAY_ON);
 				
 				sm_timer = ticks + 200;
@@ -74,13 +92,16 @@ void sm_handler(void)
 		case sms_decay:		
 			if (ticks >= sm_timer)
 			{
+				printf("done.\n");
 				relay_comp(RELAY_DECAY);
 				relay_soft(RELAY_OFF);
+				printf("pumps on\n");
 				relay_pumps(RELAY_ON);
 				
 				sm_timer = ticks + 150;
 				temp_timer = ticks;
 				sm_state = sms_regulate;
+				printf("startup complete\n");
 			}
 			break;
 		
@@ -92,10 +113,17 @@ void sm_handler(void)
 				DS_convert_T(DS_BROADCAST_ADR);
 				
 				suc_temp_pres = analog_get_suc_temp();
+				superheat = suc_temp - suc_temp_pres;
+				
+				printf("suck_t: %d, suck_pt, superheat: %d, eev: %d\n", suc_temp, suc_temp_pres, superheat, EEV_position);
 				
 				if (target_temp > (TEMP_SETPOINT + TEMP_POS_HYST))
 				{
-					sm_state = sms_shutdown;
+					printf("no call: coast down\n");
+					relay_comp(RELAY_OFF);
+			
+					sm_timer = ticks + 60000;
+					sm_state = sms_coastdown;
 					break;
 				}
 				
@@ -106,21 +134,15 @@ void sm_handler(void)
 			{
 				sm_superheat_regulator();
 				
-				sm_timer += 150;
+				sm_timer += sh_tc;
 			}
 			
-			break;
-		
-		case sms_shutdown:
-			relay_comp(RELAY_OFF);
-			
-			sm_timer = ticks + 60000;
-			sm_state = sms_coastdown;
 			break;
 		
 		case sms_coastdown:
 			if (ticks >= sm_timer)
 			{
+				printf("shutdown complete: standby\n");
 				relay_pumps(RELAY_OFF);
 				
 				temp_timer = ticks;

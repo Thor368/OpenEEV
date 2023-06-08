@@ -16,9 +16,9 @@ extern uint16_t p;
 
 void analog_init(void);
 
-uint16_t analog_get_suc_pressure(void);  // returns pressure in mbar
+int16_t analog_get_suc_pressure(void);  // returns pressure in mbar
 
-uint16_t analog_get_suc_temp(void);  // returns calculated suction temperature from pressure in 0.1C
+int16_t analog_get_suc_temp(void);  // returns calculated suction temperature from pressure in 0.1C
 
 
 #endif /* ANALOG_H_ */

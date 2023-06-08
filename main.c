@@ -11,6 +11,7 @@
 #include "relay.h"
 #include "terminal.h"
 #include "analog.h"
+#include "sm.h"
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -50,6 +51,7 @@ void init(void)
 	DS_init();
 	term_init();
 	analog_init();
+	relay_init();
 	
 	sei();
 }
@@ -66,7 +68,7 @@ int main(void)
 	test_timer = ticks + 1000;
     while (1) 
     {
-//		relay_handler();
+		sm_handler();
 		
 		if (ticks >= test_timer)
 		{

@@ -36,6 +36,11 @@
 #define TEMP_NEG_HYST	2
 #define TEMP_SETPOINT	37
 
+// Superheat controller
+#define sh_tc			2000    // ms intervall in which the controller is executed
+#define sh_setpoint		50     // 0.1°C superheat setpoint
+#define sh_hysteresis	5      // 0.1K superheat hysteresis
+
 extern uint64_t ticks;  // ms tick counter
 
 

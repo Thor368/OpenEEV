@@ -17,6 +17,8 @@
 #define RELAY_ON		1
 #define RELAY_DECAY		2
 
+void relay_init(void);
+
 void relay_comp(uint8_t state);
 
 void relay_soft(bool state);
