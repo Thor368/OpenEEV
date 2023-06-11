@@ -9,11 +9,11 @@
 
 #include <avr/interrupt.h>
 
-uint16_t p = 0;
+uint32_t p = 0;
 
 ISR(ADC_vect)
 {
-	p -= p >> 4;
+	p -= p >> 7;
 	p += ADC;
 }
 
@@ -25,7 +25,7 @@ void analog_init(void)
 
 int16_t analog_get_suc_pressure(void)
 {
-	int16_t result = p >> 4;
+	int16_t result = p >> 7;
 	return result*10 - 3490;  // 18bar max; 4-20mA sensor; 2,56V ref; 6,79bar max; R290 -> 12°C max
 }
 

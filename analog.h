@@ -12,7 +12,7 @@
 
 #include <stdint.h>
 
-extern uint16_t p;
+extern uint32_t p;
 
 void analog_init(void);
 

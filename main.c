@@ -69,6 +69,7 @@ int main(void)
     while (1) 
     {
 		sm_handler();
+		EEV_handler();
 		
 		if (ticks >= test_timer)
 		{

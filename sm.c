@@ -13,6 +13,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 
 enum sm_states { sms_init, sms_home, sms_start, sms_softstart, sms_decay, sms_regulate, sms_coastdown, sms_wait_call } sm_state;
@@ -28,14 +29,6 @@ void sm_init(void)
 	target_temp = 0;
 	suc_temp_pres = 0;
 	superheat = 0;
-}
-
-void sm_superheat_regulator(void)
-{
-	if (superheat < (sh_setpoint - sh_hysteresis))
-		EEV_position--;
-	else if (superheat > (sh_setpoint + sh_hysteresis))
-		EEV_position++;
 }
 
 void sm_handler(void)
@@ -65,7 +58,7 @@ void sm_handler(void)
 		case sms_start:
 			printf("call\n");
 			printf("set eev to min... ");
-			EEV_position = 
+			EEV_set_position(70);
 			printf("done\n");
 			printf("compressor start: soft... ");
 			relay_soft(RELAY_ON);
@@ -111,7 +104,7 @@ void sm_handler(void)
 				suc_temp_pres = analog_get_suc_temp();
 				superheat = suc_temp - suc_temp_pres;
 				
-				printf("suck_t: %d, suck_pt, superheat: %d, eev: %d\n", suc_temp, suc_temp_pres, superheat, EEV_position);
+				printf("suck_t: %+04d, suck_pt: %+04d, superheat: %+04d, eev: %03d\n", suc_temp, suc_temp_pres, superheat, EEV_get_position());
 				
 				if (target_temp > (TEMP_SETPOINT + TEMP_POS_HYST))
 				{
@@ -126,11 +119,19 @@ void sm_handler(void)
 				temp_timer += 1000;
 			}
 			
-			if (ticks >= sm_timer)
+			int16_t error = superheat - sh_setpoint;
+			if ((ticks >= sm_timer) && (abs(error) > sh_hysteresis))
 			{
-				sm_superheat_regulator();
+				uint16_t pos = EEV_get_position();
+	
+				if (pos && (error < sh_hysteresis))
+					pos--;
+				else if (superheat > sh_hysteresis)
+					pos++;
+
+				EEV_set_position(pos);
 				
-				sm_timer += sh_tc;
+				sm_timer = ticks + sh_tc;
 			}
 			
 			break;
