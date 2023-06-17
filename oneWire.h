@@ -20,8 +20,6 @@
 
 #define DS_BROADCAST_ADR	0
 
-extern uint8_t temp_adr_suc_line[];
-
 void DS_init(void);
 
 bool DS_slave_present(void);  // true if there is a slave on the bus

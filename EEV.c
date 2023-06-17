@@ -187,7 +187,12 @@ void EEV_set_position(uint16_t pos)
 //	printf("new: %d, cor: %d", pos, EEV_position_command);
 }
 
-uint16_t EEV_get_position(void)
+uint16_t EEV_get_real_position(void)
 {
 	return EEV_position_actual;
+}
+
+uint16_t EEV_get_command_position(void)
+{
+	return EEV_position_command;
 }

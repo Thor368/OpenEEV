@@ -28,9 +28,6 @@
 #define DS_RECALL_EE	0xB8
 #define DS_READ_POWER	0xB4
 
-uint8_t temp_adr_suc_line[] = {DS_SUC_ADR};
-
-
 
 void DS_init(void)
 {

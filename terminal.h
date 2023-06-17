@@ -12,5 +12,7 @@
 
 void term_init(void);
 
+void term_handler(void);
+
 
 #endif /* TERMINAL_H_ */

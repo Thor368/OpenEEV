@@ -15,18 +15,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define sign(x)				((x > 0) - (x < 0))
 
 enum sm_states { sms_init, sms_home, sms_start, sms_softstart, sms_decay, sms_regulate, sms_coastdown, sms_wait_call } sm_state;
 
+uint8_t temp_adr_suc_line[] = {DS_SUC_ADR};
+
 uint64_t sm_timer, temp_timer;
 
-int16_t suc_temp, target_temp, suc_temp_pres, superheat;
+int16_t suc_temp, suc_temp_pres, superheat;
+
+bool call = true;
 
 void sm_init(void)
 {
 	sm_state = sms_init;
 	suc_temp = 0;
-	target_temp = 0;
 	suc_temp_pres = 0;
 	superheat = 0;
 }
@@ -58,24 +62,24 @@ void sm_handler(void)
 		case sms_start:
 			printf("call\n");
 			printf("set eev to min... ");
-			EEV_set_position(70);
+			EEV_set_position(60);
 			printf("done\n");
 			printf("compressor start: soft... ");
 			relay_soft(RELAY_ON);
 			
-			sm_timer = ticks + 2000;
+			sm_timer = ticks;
 			sm_state = sms_softstart;
 			break;
 			
 		case sms_softstart:
-			if (ticks >= sm_timer)
+			if (ticks >= (sm_timer + 1000))
 			{
 				printf("hard... ");
 				relay_comp(RELAY_ON);
 				
 				sm_timer = ticks + 200;
 				sm_state = sms_decay;
-				}
+			}
 			break;
 
 		case sms_decay:		
@@ -87,7 +91,7 @@ void sm_handler(void)
 				printf("pumps on\n");
 				relay_pumps(RELAY_ON);
 				
-				sm_timer = ticks + 150;
+				sm_timer = ticks + sm_timer;
 				temp_timer = ticks;
 				sm_state = sms_regulate;
 				printf("startup complete\n");
@@ -98,15 +102,14 @@ void sm_handler(void)
 			if (ticks >= temp_timer)
 			{
 				suc_temp = DS_read_temperature(temp_adr_suc_line);
-//				target_temp = DS_read_temperature(temp_adr_target);
 				DS_convert_T(DS_BROADCAST_ADR);
 				
 				suc_temp_pres = analog_get_suc_temp();
 				superheat = suc_temp - suc_temp_pres;
 				
-				printf("suck_t: %+04d, suck_pt: %+04d, superheat: %+04d, eev: %03d\n", suc_temp, suc_temp_pres, superheat, EEV_get_position());
+				printf("suck_t: %+04d, suck_pt: %+04d, superheat: %+04d, eev: %03d\n", suc_temp, suc_temp_pres, superheat, EEV_get_real_position());
 				
-				if (target_temp > (TEMP_SETPOINT + TEMP_POS_HYST))
+				if (!call)
 				{
 					printf("no call: coast down\n");
 					relay_comp(RELAY_OFF);
@@ -122,13 +125,23 @@ void sm_handler(void)
 			int16_t error = superheat - sh_setpoint;
 			if ((ticks >= sm_timer) && (abs(error) > sh_hysteresis))
 			{
-				uint16_t pos = EEV_get_position();
-	
-				if (pos && (error < sh_hysteresis))
-					pos--;
-				else if (superheat > sh_hysteresis)
-					pos++;
+				int16_t pos = EEV_get_command_position();
+				
+				if (abs(error) <= 4)
+					error = sign(error);
+				else
+					error = error >> 2;
+				
+				pos += error;
+// 				if (pos && (error < sh_hysteresis))
+// 					pos--;
+// 				else if (superheat > sh_hysteresis)
+// 					pos++;
 
+				if (pos < 0)
+					pos = 0;
+				else if (pos > EEV_max)
+					pos = EEV_max;
 				EEV_set_position(pos);
 				
 				sm_timer = ticks + sh_tc;
@@ -148,19 +161,9 @@ void sm_handler(void)
 			break;
 			
 		case sms_wait_call:
-			if (ticks >= temp_timer)
-			{
-//				target_temp = DS_read_temperature(temp_adr_target);
-				DS_convert_T(DS_BROADCAST_ADR);
-				
-				if (target_temp < (TEMP_SETPOINT - TEMP_NEG_HYST))
-				{
-					sm_state = sms_start;
-					break;
-				}
-
-				temp_timer += 1000;
-			}
+			if (call)
+				sm_state = sms_start;
+			
 			break;
 	}
 }

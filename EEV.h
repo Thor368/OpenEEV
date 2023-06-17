@@ -30,6 +30,8 @@ void EEV_set_position(uint16_t pos);
 
 bool EEV_mooving(void);  // true if EEV has not reached its command yet
 
-uint16_t EEV_get_position(void);
+uint16_t EEV_get_real_position(void);
+
+uint16_t EEV_get_command_position(void);
 
 #endif /* EEV_H_ */

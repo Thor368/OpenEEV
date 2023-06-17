@@ -10,6 +10,7 @@
 #define CONFIG_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define F_CPU 16000000
 
@@ -28,20 +29,23 @@
 #define DS_IO			PB0
 
 // Temperature sensor addresses
+extern uint8_t temp_adr_suc_line[];
 #define DS_SUC_ADR		0x28, 0xe6, 0x14, 0x77, 0x91, 0x0a, 0x02, 0x10
 //#define DS_TARGET_ADR	0x28, 
 
-// Temperature controller
-#define TEMP_POS_HYST	2
-#define TEMP_NEG_HYST	2
-#define TEMP_SETPOINT	37
-
 // Superheat controller
-#define sh_tc			120000    // ms intervall in which the controller is executed
-#define sh_setpoint		0     // 0.1°C superheat setpoint
-#define sh_hysteresis	20      // 0.1K superheat hysteresis
+// reset values
+#define sh_tc_default			120000    // ms intervall in which the controller is executed
+#define sh_setpoint_default		0     // 0.1°C superheat setpoint
+#define sh_hysteresis_default	20      // 0.1K superheat hysteresis
+
+// working variables
+extern uint32_t sh_tc;
+extern int16_t sh_setpoint;
+extern int8_t sh_hysteresis;
 
 extern uint64_t ticks;  // ms tick counter
+extern bool call;  // call for cooling/heating
 
 
 #endif /* CONFIG_H_ */

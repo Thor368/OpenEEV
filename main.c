@@ -6,6 +6,7 @@
  */ 
 
 #include "config.h"
+#include "nv.h"
 #include "EEV.h"
 #include "oneWire.h"
 #include "relay.h"
@@ -47,6 +48,8 @@ void init(void)
 	
 	ticks = 0;
 	
+	nv_init();
+	
 	EEV_init();
 	DS_init();
 	term_init();
@@ -70,6 +73,7 @@ int main(void)
     {
 		sm_handler();
 		EEV_handler();
+		term_handler();
 		
 		if (ticks >= test_timer)
 		{
